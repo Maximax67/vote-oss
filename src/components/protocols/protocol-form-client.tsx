@@ -303,7 +303,7 @@ export function ProtocolFormClient({
   const memberUserIds = useMemo(() => new Set(group.members.map((m) => m.userId)), [group.members]);
 
   // ── Voter sync from non-anonymous linked elections ─────────────────────────
-  const linkedNonAnonElectionIds = useMemo<string[]>(() => {
+  const linkedNonAnonElectionIds: string[] = (() => {
     const ids = new Set<string>();
     for (const item of agenda) {
       if (!item.electionId) continue;
@@ -313,7 +313,7 @@ export function ProtocolFormClient({
       }
     }
     return Array.from(ids).sort();
-  }, [agenda, electionsById]);
+  })();
 
   const linkedNonAnonElectionIdsKey = linkedNonAnonElectionIds.join(',');
 
@@ -360,12 +360,13 @@ export function ProtocolFormClient({
   // append rows for voters who aren't current group members.  Gender-aware
   // present text is derived from the voter's full name.
   useEffect(() => {
+    const syncedLockedUserIds = new Set(voterInfoByUserId.keys());
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAttendees((prev) => {
       const existingUserIds = new Set(prev.filter((a) => a.userId !== null).map((a) => a.userId!));
       let changed = false;
       const updated = prev.map((a) => {
-        if (a.userId && lockedUserIds.has(a.userId) && !a.isPresent) {
+        if (a.userId && syncedLockedUserIds.has(a.userId) && !a.isPresent) {
           changed = true;
           return {
             ...a,
@@ -392,10 +393,10 @@ export function ProtocolFormClient({
       if (toAdd.length === 0 && !changed) return prev;
       return [...updated, ...toAdd];
     });
-  }, [voterInfoByUserId, lockedUserIds]);
+  }, [voterInfoByUserId]);
 
   // ── Live computed counts ──────────────────────────────────────────────────
-  const counts = useMemo(() => {
+  const counts = (() => {
     const total = group.memberCount;
     const quorum = Math.ceil((total * 2) / 3);
     let present = 0;
@@ -405,9 +406,9 @@ export function ProtocolFormClient({
       if (e && e.ballotCount > present) present = e.ballotCount;
     }
     return { total, quorum, present };
-  }, [group.memberCount, agenda, electionsById]);
+  })();
 
-  const presentCount = useMemo(() => attendees.filter((a) => a.isPresent).length, [attendees]);
+  const presentCount = attendees.filter((a) => a.isPresent).length;
 
   // ── Mutations on agenda ──────────────────────────────────────────────────
   const updateAgenda = (idx: number, patch: Partial<AgendaDraft>) => {
@@ -1199,10 +1200,10 @@ function AgendaItemEditor({
   onSetChoiceVote,
 }: AgendaItemEditorProps) {
   const linkedElection = item.electionId ? (electionsById.get(item.electionId) ?? null) : null;
-  const sortedChoices = useMemo(() => {
+  const sortedChoices = (() => {
     if (!linkedElection) return [];
     return [...linkedElection.choices].sort((a, b) => a.position - b.position);
-  }, [linkedElection]);
+  })();
 
   return (
     <div className="border-border-color rounded-lg border p-4">
