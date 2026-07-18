@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
+import { getAvatarUrlMap } from '@/lib/avatars';
 import {
   getCachedElections,
   getCachedUserVotedElections,
@@ -234,6 +235,13 @@ async function fetchGroupElections(
     votedSet = new Set();
   }
 
+  const authorIds = new Set<string>();
+  for (const e of groupElections) {
+    authorIds.add(e.createdBy);
+    if (e.approvedById) authorIds.add(e.approvedById);
+  }
+  const avatarMap = await getAvatarUrlMap([...authorIds]);
+
   let elections = toClientElections(
     groupElections,
     {
@@ -250,6 +258,7 @@ async function fetchGroupElections(
     votedSet,
     memberships,
     null,
+    avatarMap,
     adminRecord,
     adminGraph,
   );
@@ -306,7 +315,7 @@ async function fetchGroupDetail(groupId: string, user: VerifiedPayload) {
   if (!group) throw new GroupNotFoundError();
 
   const isOwner = group.owner_id === user.sub;
-  const isMember = group.members.some((m) => m.user_id === user.sub);
+  const isMember = isOwner || group.members.some((m) => m.user_id === user.sub);
   const canManage = isOwner || isAdminWithManageGroups;
   const hasAnyProtocol = group._count.protocols > 0;
 
@@ -323,6 +332,8 @@ async function fetchGroupDetail(groupId: string, user: VerifiedPayload) {
   if (!isMember && !isAdminWithManageGroups && !hasAnyPublic && !hasAnyProtocol) {
     throw new GroupForbiddenError('You are not a member of this group');
   }
+
+  const memberAvatarMap = await getAvatarUrlMap(group.members.map((m) => m.user_id));
 
   return {
     id: group.id,
@@ -350,6 +361,7 @@ async function fetchGroupDetail(groupId: string, user: VerifiedPayload) {
       role: m.role,
       joinedAt: m.joined_at.toISOString(),
       isOwner: m.user_id === group.owner_id,
+      avatarUrl: memberAvatarMap.get(m.user_id) ?? null,
     })),
     // Only expose invite links to group owner or admins with manage_groups
     inviteLinks: canManage

@@ -3,10 +3,16 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
-import { FILE_MAX_SIZE_BYTES, FILE_ORIGINAL_NAME_MAX_LENGTH } from '@/lib/constants';
+import {
+  AvatarValidationError,
+  processAvatarImage,
+  statusForAvatarError,
+} from '@/lib/avatar-image';
+import { FILE_ORIGINAL_NAME_MAX_LENGTH } from '@/lib/constants';
 import { apiError, Errors } from '@/lib/errors';
-import { detectImageMime, extensionFor, shapeFileSummary } from '@/lib/files';
+import { shapeFileSummary } from '@/lib/files';
 import { prisma } from '@/lib/prisma';
+import { rateLimitAvatarUpload } from '@/lib/rate-limit';
 import { PUBLIC_BUCKET, putObject, removeObject } from '@/lib/storage/minio';
 import { isValidUuid } from '@/lib/utils/common';
 
@@ -29,7 +35,7 @@ export const runtime = 'nodejs';
  *       from the file magic bytes regardless of the declared content-type.
  *
  *       Maximum file size is enforced by the server; the exact limit is
- *       configured via `FILE_MAX_SIZE_BYTES`.
+ *       configured via `AVATAR_MAX_SIZE_BYTES`.
  *     tags:
  *       - Groups
  *     security:
@@ -93,6 +99,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return Errors.forbidden('Only the group owner can change the logo');
   }
 
+  const limit = await rateLimitAvatarUpload(auth.user.sub);
+  if (limit.limited) {
+    return NextResponse.json(
+      {
+        error: 'TooManyRequests',
+        message: 'Too many logo uploads, try again shortly',
+        statusCode: 429,
+      },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.resetInMs / 1000)) } },
+    );
+  }
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -108,38 +126,24 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (entry.size === 0) {
     return Errors.badRequest('File is empty');
   }
-  if (entry.size > FILE_MAX_SIZE_BYTES) {
-    return apiError(
-      `File exceeds the ${Math.floor(FILE_MAX_SIZE_BYTES / (1024 * 1024))} MiB limit`,
-      413,
-      'PayloadTooLarge',
-    );
+
+  const rawBuf = Buffer.from(await entry.arrayBuffer());
+  let processed;
+  try {
+    processed = await processAvatarImage(rawBuf);
+  } catch (err) {
+    if (err instanceof AvatarValidationError) {
+      return apiError(err.message, statusForAvatarError(err.code), 'UnsupportedMediaType');
+    }
+    throw err;
   }
 
-  const buf = Buffer.from(await entry.arrayBuffer());
-  const detectedMime = detectImageMime(buf);
-  if (!detectedMime) {
-    return apiError(
-      'Unsupported file type — only PNG, JPEG, WebP, and GIF images are allowed',
-      415,
-      'UnsupportedMediaType',
-    );
-  }
-
-  if (entry.type && entry.type !== detectedMime) {
-    return apiError(
-      `Declared content-type "${entry.type}" does not match detected "${detectedMime}"`,
-      415,
-      'UnsupportedMediaType',
-    );
-  }
-
-  const sha256 = createHash('sha256').update(buf).digest('hex');
+  const sha256 = createHash('sha256').update(processed.buffer).digest('hex');
   const fileId = randomUUID();
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const objectKey = `uploads/${yyyy}/${mm}/${fileId}.${extensionFor(detectedMime)}`;
+  const objectKey = `uploads/${yyyy}/${mm}/${fileId}.webp`;
 
   const originalName =
     typeof entry.name === 'string' && entry.name.length > 0
@@ -150,8 +154,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await putObject({
       bucket: PUBLIC_BUCKET,
       objectKey,
-      body: buf,
-      contentType: detectedMime,
+      body: processed.buffer,
+      contentType: processed.mimeType,
     });
   } catch (err) {
     return apiError(
@@ -170,8 +174,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           id: fileId,
           bucket: PUBLIC_BUCKET,
           object_key: objectKey,
-          mime_type: detectedMime,
-          byte_size: buf.length,
+          mime_type: processed.mimeType,
+          byte_size: processed.buffer.length,
           sha256,
           original_name: originalName,
           uploaded_by: auth.user.sub,

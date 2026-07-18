@@ -1,4 +1,4 @@
-import { Calendar, ChevronRight, Clock, Eye, EyeOff, FileText, User } from 'lucide-react';
+import { Calendar, ChevronRight, Clock, Eye, EyeOff, FileText } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
@@ -16,6 +16,7 @@ import { WinningConditionsDisplay } from '@/components/elections/winning-conditi
 import { Button } from '@/components/ui/button';
 import { LocalDateTime } from '@/components/ui/local-time';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { UserAvatarMenu } from '@/components/ui/user-avatar-menu';
 import { serverApi } from '@/lib/api/server';
 import { APP_URL } from '@/lib/config/client';
 import { checkRestrictionsWithBypass } from '@/lib/restrictions';
@@ -139,7 +140,14 @@ export default async function ElectionPage({ params }: ElectionPageProps) {
               </h1>
               <div className="font-body text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
                 <span className="flex items-center gap-1.5">
-                  <User className="h-4 w-4" />
+                  <UserAvatarMenu
+                    icon
+                    userId={election.createdBy.userId}
+                    fullName={election.createdBy.fullName}
+                    avatarUrl={election.createdBy.avatarUrl}
+                    canDelete={session.isAdmin}
+                    size={election.createdBy.avatarUrl ? 32 : 16}
+                  />
                   {election.createdBy.fullName}
                 </span>
 

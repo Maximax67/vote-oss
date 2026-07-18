@@ -1,4 +1,4 @@
-import { Calendar, Clock, User } from 'lucide-react';
+import { Calendar, Clock } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
@@ -9,6 +9,7 @@ import { PetitionSignatories } from '@/components/petitions/petition-signatories
 import { SignPetitionPanel } from '@/components/petitions/sign-petition-panel';
 import { LocalDate, LocalDateTime } from '@/components/ui/local-time';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { UserAvatarMenu } from '@/components/ui/user-avatar-menu';
 import { serverApi } from '@/lib/api/server';
 import { APP_URL } from '@/lib/config/client';
 import { PETITION_QUORUM } from '@/lib/constants';
@@ -123,7 +124,14 @@ export default async function PetitionPage({ params }: PetitionPageProps) {
 
               <div className="font-body text-muted-foreground mt-4 space-y-1 text-sm">
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <User className="h-4 w-4 shrink-0" />
+                  <UserAvatarMenu
+                    icon
+                    userId={petition.createdBy.userId}
+                    avatarUrl={petition.createdBy.avatarUrl}
+                    fullName={petition.createdBy.fullName}
+                    canDelete={session.isAdmin}
+                    size={16}
+                  />
                   <span className="truncate">{petition.createdBy.fullName}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
@@ -156,6 +164,7 @@ export default async function PetitionPage({ params }: PetitionPageProps) {
                 ballotCount={petition.ballotCount}
                 initialData={signatoriesResult?.data ?? null}
                 fetchError={signatoriesResult?.error ?? null}
+                isAdmin={session.isAdmin}
               />
             )}
           </div>

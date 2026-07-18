@@ -13,6 +13,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { SearchInput } from '@/components/ui/search-input';
 import type { Tab } from '@/components/ui/tabs';
 import { Tabs } from '@/components/ui/tabs';
+import { ensureAvatars } from '@/lib/avatar-store';
 import { BALLOTS_PAGE_SIZE } from '@/lib/constants';
 import { decryptBallotData, importPrivateKey, verifyBallotHash } from '@/lib/crypto';
 import { cn, pluralize } from '@/lib/utils/common';
@@ -23,6 +24,7 @@ import type { VoteRecord } from '@/types/vote';
 
 interface BallotsClientProps {
   initialData: BallotsResponse;
+  isAdmin: boolean;
 }
 
 type ActiveTab = 'ballots' | 'analytics';
@@ -32,7 +34,7 @@ const tabs: Tab<ActiveTab>[] = [
   { key: 'analytics', label: 'Аналітика', icon: <BarChart2 className="h-3.5 w-3.5" /> },
 ];
 
-export function BallotsClient({ initialData }: BallotsClientProps) {
+export function BallotsClient({ initialData, isAdmin }: BallotsClientProps) {
   const { ballots, election } = initialData;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('ballots');
@@ -150,6 +152,16 @@ export function BallotsClient({ initialData }: BallotsClientProps) {
     (safePage - 1) * BALLOTS_PAGE_SIZE,
     safePage * BALLOTS_PAGE_SIZE,
   );
+
+  const pageBallotIds = pagedBallots.map((b) => b.id).join(',');
+  useEffect(() => {
+    if (!decryptionDone) return;
+    const voterIds = pagedBallots
+      .map((b) => decryptedMap.get(b.id)?.voter?.userId)
+      .filter((id): id is string => !!id);
+    if (voterIds.length > 0) void ensureAvatars(voterIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageBallotIds, decryptionDone]);
 
   useEffect(() => {
     if (!myVoteRecord) return;
@@ -357,6 +369,7 @@ export function BallotsClient({ initialData }: BallotsClientProps) {
                       <BallotRow
                         ballot={ballot}
                         index={(safePage - 1) * BALLOTS_PAGE_SIZE + index + 1}
+                        isAdmin={isAdmin}
                         isExpanded={expandedIds.has(ballot.id)}
                         onToggle={() => toggleExpand(ballot.id)}
                         decryption={

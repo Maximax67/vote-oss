@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { JoinAdminForm } from '@/components/admin/join-admin-form';
+import { SelfAvatar } from '@/components/ui/self-avatar';
 import { getServerSession } from '@/lib/server-auth';
+import type { User } from '@/types/auth';
 
 export const metadata: Metadata = {
   title: 'Приєднатися як адміністратор',
@@ -30,7 +32,7 @@ export function JoinPageContent({
   session,
   initialToken,
 }: {
-  session: { fullName: string; faculty: string; group: string };
+  session: User;
   initialToken?: string;
 }) {
   return (
@@ -45,7 +47,7 @@ export function JoinPageContent({
       <div className="relative w-full max-w-lg">
         <div className="border-border-color shadow-shadow-xl overflow-hidden rounded-2xl border bg-white">
           {/* Top accent bar */}
-          <div className="navy-gradient h-1.5 w-full" />
+          <div className="bg-kpi-navy h-1.5 w-full" />
 
           {/* Card header */}
           <div className="border-border-subtle border-b px-8 pt-8 pb-6">
@@ -55,9 +57,7 @@ export function JoinPageContent({
 
             {/* User info banner */}
             <div className="border-border-subtle bg-surface flex items-center gap-3 rounded-lg border p-3.5">
-              <div className="navy-gradient flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
-                {session.fullName.charAt(0).toUpperCase()}
-              </div>
+              <SelfAvatar userId={session.userId} fullName={session.fullName} size={36} />
               <div className="min-w-0 flex-1">
                 <p className="font-body text-foreground text-sm font-semibold wrap-break-word">
                   {session.fullName}

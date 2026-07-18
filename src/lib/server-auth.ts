@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { cache } from 'react';
 
 import type { User } from '@/types/auth';
 
@@ -13,7 +14,7 @@ function decodeHeader(headerValue: string | null): string {
   }
 }
 
-export async function getServerSession(): Promise<User | null> {
+export const getServerSession = cache(async (): Promise<User | null> => {
   const h = await headers();
   const userId = h.get('x-user-id');
   if (!userId) return null;
@@ -36,4 +37,4 @@ export async function getServerSession(): Promise<User | null> {
     managePetitions: isAdmin && h.get('x-user-manage-petitions') === 'true',
     manageFaq: isAdmin && h.get('x-user-manage-faq') === 'true',
   };
-}
+});

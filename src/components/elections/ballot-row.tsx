@@ -5,12 +5,14 @@ import {
   LinkIcon,
   ShieldAlert,
   ShieldCheck,
-  User,
   UserCheck,
   Vote,
   XCircle,
 } from 'lucide-react';
 
+import { Avatar } from '@/components/ui/avatar';
+import { UserAvatarMenu } from '@/components/ui/user-avatar-menu';
+import { useAvatar } from '@/hooks/use-avatar';
 import { cn } from '@/lib/utils/common';
 import type { Ballot, DecryptionResult } from '@/types/ballot';
 import type { ElectionChoice } from '@/types/election';
@@ -24,6 +26,7 @@ interface BallotRowProps {
   choices: ElectionChoice[];
   isMyBallot?: boolean;
   myStoredChoiceLabels?: string[];
+  isAdmin?: boolean;
 }
 
 export function BallotRow({
@@ -35,10 +38,12 @@ export function BallotRow({
   choices,
   isMyBallot = false,
   myStoredChoiceLabels,
+  isAdmin = false,
 }: BallotRowProps) {
   const isMalformed = decryption !== undefined && !decryption.valid;
   const isBadHash = decryption !== undefined && !decryption.hashValid;
   const isAnomalous = isMalformed || isBadHash;
+  const voterAvatarUrl = useAvatar(decryption?.voter?.userId);
 
   // Compare locally-stored choice with the decrypted one
   const myChoiceVerified =
@@ -100,10 +105,16 @@ export function BallotRow({
             </p>
           )}
           {decryption?.voter && (
-            <p className="font-body text-muted-foreground truncate text-xs">
-              <User className="mr-1 inline h-3 w-3" />
-              {decryption.voter.fullName}
-            </p>
+            <div className="font-body text-muted-foreground flex">
+              <Avatar
+                icon
+                src={voterAvatarUrl}
+                name={decryption.voter.fullName}
+                size={12}
+                className="mr-1 inline-flex align-text-bottom"
+              />
+              <p className="truncate text-xs">{decryption.voter.fullName}</p>
+            </div>
           )}
         </div>
 
@@ -197,7 +208,14 @@ export function BallotRow({
                   Голосуючий
                 </p>
                 <div className="border-kpi-blue-light/30 bg-info-bg flex items-center gap-2 rounded-(--radius) border p-3">
-                  <User className="text-kpi-blue-light h-4 w-4 shrink-0" />
+                  <UserAvatarMenu
+                    icon
+                    userId={decryption.voter.userId}
+                    fullName={decryption.voter.fullName}
+                    avatarUrl={voterAvatarUrl}
+                    canDelete={isAdmin}
+                    size={20}
+                  />
                   <div className="min-w-0">
                     <p className="font-body text-foreground text-sm font-semibold wrap-break-word">
                       {decryption.voter.fullName}

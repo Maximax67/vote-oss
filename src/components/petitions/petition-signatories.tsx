@@ -4,6 +4,11 @@ import { Loader2, ShieldAlert, ShieldCheck, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { LocalDateTime } from '@/components/ui/local-time';
+import { Pagination } from '@/components/ui/pagination';
+import { UserAvatarMenu } from '@/components/ui/user-avatar-menu';
+import { useAvatar } from '@/hooks/use-avatar';
+import { ensureAvatars } from '@/lib/avatar-store';
+import { SIGNATORIES_PAGE_SIZE } from '@/lib/constants';
 import { decryptBallotData, importPrivateKey, verifyBallotHash } from '@/lib/crypto';
 import { pluralize } from '@/lib/utils/common';
 import type { PetitionSignatoriesResponse } from '@/types/ballot';
@@ -20,17 +25,43 @@ interface PetitionSignatoriesProps {
   ballotCount: number;
   initialData: PetitionSignatoriesResponse | null;
   fetchError: string | null;
+  isAdmin?: boolean;
+}
+
+function SignatoryRow({ signatory, isAdmin }: { signatory: Signatory; isAdmin: boolean }) {
+  const avatarUrl = useAvatar(signatory.userId);
+  return (
+    <li className="flex items-center gap-3 px-5 py-3">
+      <UserAvatarMenu
+        userId={signatory.userId}
+        fullName={signatory.fullName}
+        avatarUrl={avatarUrl}
+        canDelete={isAdmin}
+        size={32}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="font-body text-foreground truncate text-sm font-medium">
+          {signatory.fullName}
+        </p>
+        <p className="font-body text-muted-foreground mt-0.5 text-xs">
+          <LocalDateTime date={signatory.signedAt} /> • {signatory.userId}
+        </p>
+      </div>
+    </li>
+  );
 }
 
 export function PetitionSignatories({
   ballotCount,
   initialData,
   fetchError,
+  isAdmin = false,
 }: PetitionSignatoriesProps) {
   const [signatories, setSignatories] = useState<Signatory[] | null>(null);
   const [malformedCount, setMalformedCount] = useState(0);
   const [invalidHashCount, setInvalidHashCount] = useState(0);
   const [decryptError, setDecryptError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!initialData) {
@@ -102,6 +133,7 @@ export function PetitionSignatories({
         setMalformedCount(malformed);
         setInvalidHashCount(invalidHash);
         setDecryptError(null);
+        setPage(1);
       }
     })();
 
@@ -111,6 +143,21 @@ export function PetitionSignatories({
   }, [initialData]);
 
   const total = signatories?.length ?? ballotCount;
+  const totalPages = Math.max(1, Math.ceil((signatories?.length ?? 0) / SIGNATORIES_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedSignatories = (signatories ?? []).slice(
+    (safePage - 1) * SIGNATORIES_PAGE_SIZE,
+    safePage * SIGNATORIES_PAGE_SIZE,
+  );
+  const pageIdsKey = pagedSignatories.map((s) => s.userId).join(',');
+
+  // Only resolve avatars for whoever is on screen right now — not all
+  // signatories at once (which used to 400 past ~200 signatories).
+  useEffect(() => {
+    const ids = pagedSignatories.map((s) => s.userId);
+    if (ids.length > 0) void ensureAvatars(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIdsKey]);
 
   return (
     <div className="border-border-color shadow-shadow-sm min-w-0 rounded-xl border bg-white">
@@ -181,23 +228,18 @@ export function PetitionSignatories({
               Жодного підпису не вдалося розшифрувати.
             </p>
           ) : (
-            <ul className="divide-border-subtle divide-y">
-              {signatories.map((s) => (
-                <li key={s.ballotId} className="flex items-center gap-3 px-5 py-3">
-                  <div className="navy-gradient flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white">
-                    {s.fullName.charAt(0)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-body text-foreground truncate text-sm font-medium">
-                      {s.fullName}
-                    </p>
-                    <p className="font-body text-muted-foreground mt-0.5 text-xs">
-                      <LocalDateTime date={s.signedAt} /> • {s.userId}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="divide-border-subtle divide-y">
+                {pagedSignatories.map((s) => (
+                  <SignatoryRow key={s.ballotId} signatory={s} isAdmin={isAdmin} />
+                ))}
+              </ul>
+              {totalPages > 1 && (
+                <div className="border-border-subtle border-t px-5 py-3">
+                  <Pagination page={safePage} totalPages={totalPages} setPage={setPage} />
+                </div>
+              )}
+            </>
           )}
         </>
       )}
