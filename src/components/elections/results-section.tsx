@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 
+import { ResultsChart } from '@/components/elections/result-chart';
+import type { ChoiceSortOrder } from '@/components/elections/sort-choices-button';
+import { SortChoicesButton } from '@/components/elections/sort-choices-button';
 import { Badge } from '@/components/ui/badge';
 import { pluralize } from '@/lib/utils/common';
 import type { ElectionChoice } from '@/types/election';
-
-import { ResultsChart } from './result-chart';
-import { type ChoiceSortOrder, SortChoicesButton } from './sort-choices-button';
 
 interface ResultsSectionProps {
   title: string;
@@ -31,7 +31,7 @@ export function ResultsSection({
 
   if (variant === 'admin') {
     return (
-      <div className="border-border-color shadow-shadow-card overflow-hidden rounded-xl border bg-white">
+      <div className="border-border-color shadow-card overflow-hidden rounded-xl border bg-white">
         <div className="border-border-subtle flex items-center gap-3 border-b px-4 py-4 sm:px-6">
           <h2 className="font-display text-foreground flex-1 text-base font-semibold sm:text-lg">
             {title}
@@ -55,7 +55,7 @@ export function ResultsSection({
   }
 
   return (
-    <div className="border-border-color shadow-shadow-sm rounded-xl border bg-white p-6">
+    <div className="border-border-color rounded-xl border bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="font-display text-foreground text-xl font-semibold">{title}</h2>
         {showSort && <SortChoicesButton value={sortOrder} onChange={setSortOrder} />}

@@ -15,7 +15,7 @@ interface PetitionCardProps {
 
 export function PetitionCard({ petition, index = 0 }: PetitionCardProps) {
   const quorum = petition.winningConditions.quorum ?? PETITION_QUORUM;
-  const pct = Math.min(100, Math.round((petition.ballotCount / quorum) * 100));
+  const pct = quorum > 0 ? Math.min(100, Math.round((petition.ballotCount / quorum) * 100)) : 100;
   const reached = petition.ballotCount >= quorum;
   const isPending = !petition.approved;
   const isClosed = petition.status === 'closed';
@@ -26,7 +26,7 @@ export function PetitionCard({ petition, index = 0 }: PetitionCardProps) {
       className={cn(
         'group block rounded-xl bg-white',
         'border-border-color border',
-        'shadow-shadow-card hover:shadow-shadow-card-hover',
+        'shadow-card hover:shadow-card-hover',
         'transition-all duration-300 hover:-translate-y-1',
         'animate-fade-up overflow-hidden',
       )}
